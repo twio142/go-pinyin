@@ -28,6 +28,7 @@ var (
 	// Command-line flags
 	initials = flag.Bool("initials", false, "Convert to Pinyin initials")
 	xiaohe   = flag.Bool("xiaohe", false, "Convert to Xiaohe Shuangpin")
+	help     = flag.Bool("h", false, "Show usage message")
 )
 
 func init() {
@@ -93,8 +94,23 @@ func convertFullWidth(s string) string {
 	return b.String()
 }
 
+func printUsage() {
+	fmt.Fprintf(os.Stderr, "Usage: %s [options]\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "\nOptions:\n")
+	fmt.Fprintf(os.Stderr, "  -initials    Convert to Pinyin initials\n")
+	fmt.Fprintf(os.Stderr, "  -xiaohe      Convert to Xiaohe Shuangpin\n")
+	fmt.Fprintf(os.Stderr, "  -h           Show this message\n")
+	fmt.Fprintf(os.Stderr, "\nReads from standard input and converts Chinese characters to Pinyin.\n")
+}
+
 func main() {
 	flag.Parse()
+
+	// Check if help flag is set
+	if *help {
+		printUsage()
+		return
+	}
 
 	// Configure pinyin conversion arguments based on flags.
 	a := pinyin.NewArgs()

@@ -28,6 +28,7 @@ var (
 	// Command-line flags
 	initials = flag.Bool("initials", false, "Convert to Pinyin initials")
 	xiaohe   = flag.Bool("xiaohe", false, "Convert to Xiaohe Shuangpin")
+	only     = flag.Bool("only", false, "Print only converted text, not original text")
 	help     = flag.Bool("h", false, "Show usage message")
 )
 
@@ -99,6 +100,7 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "\nOptions:\n")
 	fmt.Fprintf(os.Stderr, "  -initials    Convert to Pinyin initials\n")
 	fmt.Fprintf(os.Stderr, "  -xiaohe      Convert to Xiaohe Shuangpin\n")
+	fmt.Fprintf(os.Stderr, "  -only        Print only converted text, not original text\n")
 	fmt.Fprintf(os.Stderr, "  -h           Show this message\n")
 	fmt.Fprintf(os.Stderr, "\nReads from standard input and converts Chinese characters to Pinyin.\n")
 }
@@ -118,7 +120,7 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		line := scanner.Text()
-		processLine(line, a, *initials, *xiaohe)
+		processLine(line, a, *initials, *xiaohe, *only)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -126,7 +128,7 @@ func main() {
 	}
 }
 
-func processLine(line string, args pinyin.Args, isInitialMode bool, isXiaoheMode bool) {
+func processLine(line string, args pinyin.Args, isInitialMode bool, isXiaoheMode bool, isOnlyMode bool) {
 	// Convert full-width characters to half-width using the dictionary.
 	halfWidthLine := convertFullWidth(line)
 
@@ -207,10 +209,20 @@ func processLine(line string, args pinyin.Args, isInitialMode bool, isXiaoheMode
 	result = spaceCollapseRegex.ReplaceAllString(result, " ")
 	result = strings.TrimSpace(result)
 
-	// Only print both lines if a conversion happened.
-	if result != line {
-		fmt.Printf("%s\t%s\n", line, result)
+	// Handle output based on mode
+	if isOnlyMode {
+		// In only mode, print converted text if conversion happened, otherwise print original line
+		if result != line {
+			fmt.Println(result)
+		} else {
+			fmt.Println(line)
+		}
 	} else {
-		fmt.Println(line)
+		// Default mode: print both lines if a conversion happened
+		if result != line {
+			fmt.Printf("%s\t%s\n", line, result)
+		} else {
+			fmt.Println(line)
+		}
 	}
 }

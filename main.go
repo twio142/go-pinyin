@@ -34,13 +34,6 @@ var (
 
 func init() {
 	// Populate the full-width to half-width dictionary
-	for i := range 26 {
-		fullWidthDict[rune(0xFF21+i)] = rune('A' + i) // A-Z
-		fullWidthDict[rune(0xFF41+i)] = rune('a' + i) // a-z
-	}
-	for i := range 10 {
-		fullWidthDict[rune(0xFF10+i)] = rune('0' + i) // 0-9
-	}
 	fullWidthDict['，'] = ','
 	fullWidthDict['。'] = '.'
 	fullWidthDict['？'] = '?'
@@ -69,9 +62,9 @@ func init() {
 	// Populate Xiaohe Shuangpin final map
 	xiaoheFinalMap = map[string]string{
 		"a": "a", "o": "o", "e": "e", "i": "i", "u": "u", "v": "u",
-		"ai": "d", "ei": "w", "ao": "k", "ou": "z",
+		"ai": "d", "ei": "w", "ao": "c", "ou": "z",
 		"an": "j", "en": "f", "ang": "h", "eng": "g", "ong": "s", "iong": "s",
-		"ia": "x", "ie": "p", "iao": "n", "iu": "q", "ian": "m", "in": "b", "iang": "l", "ing": "y",
+		"ia": "x", "ie": "p", "iao": "n", "iu": "q", "ian": "m", "in": "b", "iang": "l", "ing": "k",
 		"ua": "x", "uo": "o", "uai": "k", "ui": "v", "uan": "r", "un": "y", "uang": "l",
 		"ve": "t", "vn": "y",
 	}
@@ -93,6 +86,14 @@ func convertFullWidth(s string) string {
 		}
 	}
 	return b.String()
+}
+
+func addSpacingAfterPunctuation(s string) string {
+	regex := regexp.MustCompile(`([,.!?;:])(\w)`)
+	result := regex.ReplaceAllStringFunc(s, func(match string) string {
+		return match[0:1] + " " + match[1:]
+	})
+	return result
 }
 
 func printUsage() {
@@ -208,6 +209,9 @@ func processLine(line string, args pinyin.Args, isInitialMode bool, isXiaoheMode
 	// Clean up spacing.
 	result = spaceCollapseRegex.ReplaceAllString(result, " ")
 	result = strings.TrimSpace(result)
+
+	// Add proper spacing around punctuation marks
+	result = addSpacingAfterPunctuation(result)
 
 	// Handle output based on mode
 	if isOnlyMode {

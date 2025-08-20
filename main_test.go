@@ -6,8 +6,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/mozillazg/go-pinyin"
 )
 
 // Helper function to capture stdout
@@ -81,7 +79,7 @@ func TestProcessLine(t *testing.T) {
 			isInitialMode: false,
 			isXiaoheMode:  false,
 			isOnlyMode:    false,
-			expected:      "你好，world！	ni hao , world!",
+			expected:      "你好，world！	ni hao , world !",
 		},
 		{
 			name:          "Mixed Text",
@@ -107,16 +105,29 @@ func TestProcessLine(t *testing.T) {
 			isOnlyMode:    false,
 			expected:      "Hello World",
 		},
+		{
+			name:          "Heteronyms",
+			line:          "中长期目标",
+			isInitialMode: false,
+			isXiaoheMode:  false,
+			isOnlyMode:    true,
+			expected:      "zhong zhang chang qi ji mu biao",
+		},
+		{
+			name:          "Heteronyms Xiaohe Mode",
+			line:          "中长期目标",
+			isInitialMode: false,
+			isXiaoheMode:  true,
+			isOnlyMode:    true,
+			expected:      "vs vh ih qi ji mu bn",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a new pinyin Args object for each test
-			args := pinyin.NewArgs()
-
 			// Capture the output of processLine
 			output := captureOutput(func() {
-				processLine(tt.line, args, tt.isInitialMode, tt.isXiaoheMode, tt.isOnlyMode)
+				processLine(tt.line, tt.isInitialMode, tt.isXiaoheMode, tt.isOnlyMode)
 			})
 
 			// Trim whitespace and compare

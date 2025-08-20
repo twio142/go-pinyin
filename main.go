@@ -13,7 +13,9 @@ import (
 
 var (
 	// Regex to detect consecutive Chinese characters.
-	hanRegex = regexp.MustCompile(`[\p{Han}]+`)
+	fullWidthRegex = regexp.MustCompile(`[\p{Han}，。！？：；（）【】]+`)
+	// Regex to match Pinyin characters (lowercase letters).
+	pinyinRegex = regexp.MustCompile(`[a-z]+`)
 	// Regex to collapse multiple spaces.
 	spaceCollapseRegex = regexp.MustCompile(`\s{2,}`)
 
@@ -44,10 +46,6 @@ func init() {
 	fullWidthDict['）'] = ')'
 	fullWidthDict['【'] = '['
 	fullWidthDict['】'] = ']'
-	fullWidthDict['“'] = '"'
-	fullWidthDict['”'] = '"'
-	fullWidthDict['‘'] = '\''
-	fullWidthDict['’'] = '\''
 
 	// Populate Xiaohe Shuangpin initial map
 	xiaoheInitialMap = map[string]string{
@@ -57,6 +55,7 @@ func init() {
 		"j": "j", "q": "q", "x": "x",
 		"z": "z", "c": "c", "s": "s",
 		"zh": "v", "ch": "i", "sh": "u", "r": "r",
+		"w": "w", "y": "y",
 	}
 
 	// Populate Xiaohe Shuangpin final map
@@ -75,24 +74,15 @@ func init() {
 	}
 }
 
-func convertFullWidth(s string) string {
-	var b strings.Builder
-	b.Grow(len(s))
-	for _, r := range s {
-		if replacement, ok := fullWidthDict[r]; ok {
-			b.WriteRune(replacement)
-		} else {
-			b.WriteRune(r)
+func removeDuplicates(slice []string) []string {
+	seen := make(map[string]bool)
+	result := []string{}
+	for _, item := range slice {
+		if !seen[item] {
+			seen[item] = true
+			result = append(result, item)
 		}
 	}
-	return b.String()
-}
-
-func addSpacingAfterPunctuation(s string) string {
-	regex := regexp.MustCompile(`([,.!?;:])(\w)`)
-	result := regex.ReplaceAllStringFunc(s, func(match string) string {
-		return match[0:1] + " " + match[1:]
-	})
 	return result
 }
 
@@ -115,13 +105,10 @@ func main() {
 		return
 	}
 
-	// Configure pinyin conversion arguments based on flags.
-	a := pinyin.NewArgs()
-
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		line := scanner.Text()
-		processLine(line, a, *initials, *xiaohe, *only)
+		processLine(line, *initials, *xiaohe, *only)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -129,98 +116,94 @@ func main() {
 	}
 }
 
-func processLine(line string, args pinyin.Args, isInitialMode bool, isXiaoheMode bool, isOnlyMode bool) {
-	// Convert full-width characters to half-width using the dictionary.
-	halfWidthLine := convertFullWidth(line)
-
+func processLine(line string, isInitialMode bool, isXiaoheMode bool, isOnlyMode bool) {
 	// In-place replace Chinese characters with Pinyin.
-	result := hanRegex.ReplaceAllStringFunc(halfWidthLine, func(s string) string {
-		var convertedPinyin string
+	result := fullWidthRegex.ReplaceAllStringFunc(line, func(s string) string {
+		args := pinyin.NewArgs() // Args for normal Pinyin to get initials/finals
+		args.Heteronym = true
+		args.Fallback = func(r rune, a pinyin.Args) []string {
+			if halfWidthChar, ok := fullWidthDict[r]; ok {
+				return []string{string(halfWidthChar) + " "}
+			}
+			return []string{string(r)}
+		}
+
+		var stringBuilder strings.Builder
 
 		if isXiaoheMode {
-			var xiaoheBuilder strings.Builder
-			normalArgs := pinyin.NewArgs() // Args for normal Pinyin to get initials/finals
-
 			for _, r := range s { // Iterate through each Hanzi character in the matched string 's'
-				pinyinSyllables := pinyin.Pinyin(string(r), normalArgs) // Get Pinyin for single Hanzi
-				if len(pinyinSyllables) > 0 && len(pinyinSyllables[0]) > 0 {
-					pinyinStr := pinyinSyllables[0][0] // Get the first (normal) Pinyin pronunciation
-
-					// Check for zero-initials first
-					if mappedZeroInitial, ok := xiaoheZeroInitialMap[pinyinStr]; ok {
-						xiaoheBuilder.WriteString(mappedZeroInitial)
-					} else {
-						// Not a zero-initial, get initial and final
-						initialsForRune := pinyin.Pinyin(string(r), pinyin.Args{Style: pinyin.Initials})
-						finalsForRune := pinyin.Pinyin(string(r), pinyin.Args{Style: pinyin.Finals})
-
-						initial := ""
-						final := ""
-
-						if len(initialsForRune) > 0 && len(initialsForRune[0]) > 0 {
-							initial = initialsForRune[0][0]
-						}
-						if len(finalsForRune) > 0 && len(finalsForRune[0]) > 0 {
-							final = finalsForRune[0][0]
-						}
-
-						mappedInitial, initialExists := xiaoheInitialMap[initial]
-						mappedFinal, finalExists := xiaoheFinalMap[final]
-
-						if initialExists && finalExists {
-							xiaoheBuilder.WriteString(mappedInitial)
-							xiaoheBuilder.WriteString(mappedFinal)
+				pinyinSyllables := pinyin.Pinyin(string(r), args) // Get Pinyin for single Hanzi
+				if len(pinyinSyllables) > 0 {
+					pinyinSyllables[0] = removeDuplicates(pinyinSyllables[0]) // Remove duplicates in the first slice
+					for _, pinyinStr := range pinyinSyllables[0] {
+						if !pinyinRegex.MatchString(pinyinStr) || len(pinyinStr) == 2 {
+							stringBuilder.WriteString(pinyinStr)
+						} else if mappedZeroInitial, ok := xiaoheZeroInitialMap[pinyinStr]; ok {
+							if isInitialMode {
+								stringBuilder.WriteString(mappedZeroInitial[:1])
+							} else {
+								stringBuilder.WriteString(mappedZeroInitial)
+							}
 						} else {
-							// Fallback to normal Pinyin if mapping not found (should not happen with complete maps)
-							xiaoheBuilder.WriteString(pinyinStr)
+							initial := pinyinStr[0:2] // Get the first two characters as initial
+							if mappedInitial, ok := xiaoheInitialMap[initial]; ok {
+								stringBuilder.WriteString(mappedInitial)
+								if !isInitialMode {
+									final := pinyinStr[2:] // Get the rest as final
+									if mappedFinal, ok := xiaoheFinalMap[final]; ok {
+										stringBuilder.WriteString(mappedFinal)
+									}
+								}
+							} else {
+								initial := pinyinStr[0:1] // Fallback to first character if no mapping found
+								if mappedInitial, ok := xiaoheInitialMap[initial]; ok {
+									stringBuilder.WriteString(mappedInitial)
+									if !isInitialMode {
+										final := pinyinStr[1:] // Get the rest as final
+										if mappedFinal, ok := xiaoheFinalMap[final]; ok {
+											stringBuilder.WriteString(mappedFinal)
+										}
+									}
+								} else {
+									// Fallback to normal Pinyin if mapping not found (should not happen with complete maps)
+									if isInitialMode {
+										stringBuilder.WriteString(pinyinStr[:1])
+									} else {
+										stringBuilder.WriteString(pinyinStr)
+									}
+								}
+							}
 						}
+						stringBuilder.WriteString(" ")
 					}
 				}
 				// Add a space after each converted character's Xiaohe Pinyin
-				xiaoheBuilder.WriteString(" ")
-			}
-			convertedPinyin = strings.TrimSpace(xiaoheBuilder.String())
-
-			if isInitialMode {
-				parts := strings.Split(convertedPinyin, " ")
-				initialsSlice := make([]string, 0, len(parts))
-				for _, part := range parts {
-					if len(part) > 0 {
-						initialsSlice = append(initialsSlice, string(part[0]))
-					}
-				}
-				convertedPinyin = strings.Join(initialsSlice, " ")
+				stringBuilder.WriteString(" ")
 			}
 		} else {
-			// Not Xiaohe mode, check for initials or normal
+			// Not Xiaohe mode
 			if isInitialMode {
 				args.Style = pinyin.FirstLetter
 			} else {
 				args.Style = pinyin.Normal // Default
 			}
-			pinyinSlices := pinyin.LazyConvert(s, &args)
-			convertedPinyin = strings.Join(pinyinSlices, " ")
-		}
 
-		// Pad with spaces to ensure separation from non-Chinese parts.
-		return " " + convertedPinyin + " "
+			for _, slice := range pinyin.Pinyin(s, args) {
+				slice = removeDuplicates(slice)
+				stringBuilder.WriteString(strings.Join(slice, " "))
+				stringBuilder.WriteString(" ")
+			}
+		}
+		return " " + strings.TrimSpace(stringBuilder.String()) + " "
 	})
 
 	// Clean up spacing.
 	result = spaceCollapseRegex.ReplaceAllString(result, " ")
 	result = strings.TrimSpace(result)
 
-	// Add proper spacing around punctuation marks
-	result = addSpacingAfterPunctuation(result)
-
 	// Handle output based on mode
 	if isOnlyMode {
-		// In only mode, print converted text if conversion happened, otherwise print original line
-		if result != line {
-			fmt.Println(result)
-		} else {
-			fmt.Println(line)
-		}
+		fmt.Println(result)
 	} else {
 		// Default mode: print both lines if a conversion happened
 		if result != line {

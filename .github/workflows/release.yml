@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      SHA256: ${{ steps.checksum.outputs.SHA256 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test
+        run: go test -v ./...
+
+      - name: Get SHA256 of the official source tarball
+        id: checksum
+        run: |
+          TARBALL_URL="https://github.com/${{ github.repository }}/archive/refs/tags/${{ github.ref_name }}.tar.gz"
+          curl -L -o source.tar.gz "${TARBALL_URL}"
+          SHA256=$(shasum -a 256 source.tar.gz | awk '{print $1}')
+          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+
+  update-homebrew-tap:
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - name: Update Homebrew formula
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          brew tap twio142/homebrew-tap
+          brew bump-formula-pr \
+            --sha256="${{ needs.build.outputs.SHA256 }}" \
+            --url="https://github.com/${{ github.repository }}/archive/refs/tags/${{ github.ref_name }}.tar.gz" \
+            twio142/homebrew-tap/go-pinyin

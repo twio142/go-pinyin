@@ -136,7 +136,7 @@ func processLine(line string, isInitialMode bool, isXiaoheMode bool, isOnlyMode 
 				if len(pinyinSyllables) > 0 {
 					pinyinSyllables[0] = removeDuplicates(pinyinSyllables[0]) // Remove duplicates in the first slice
 					for _, pinyinStr := range pinyinSyllables[0] {
-						if !pinyinRegex.MatchString(pinyinStr) || len(pinyinStr) == 2 {
+						if !pinyinRegex.MatchString(pinyinStr) {
 							stringBuilder.WriteString(pinyinStr)
 						} else if mappedZeroInitial, ok := xiaoheZeroInitialMap[pinyinStr]; ok {
 							if isInitialMode {

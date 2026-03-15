@@ -16,10 +16,10 @@ func captureOutput(f func()) string {
 
 	f()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	return buf.String()
 }
 
@@ -120,6 +120,14 @@ func TestProcessLine(t *testing.T) {
 			isXiaoheMode:  true,
 			isOnlyMode:    true,
 			expected:      "vs vh ih qi ji mu bn",
+		},
+		{
+			name:          "Xiaohe ü finals",
+			line:          "确雪女绿",
+			isInitialMode: false,
+			isXiaoheMode:  true,
+			isOnlyMode:    true,
+			expected:      "qt xt nv ru lv lu",
 		},
 	}
 

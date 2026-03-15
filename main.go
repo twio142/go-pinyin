@@ -60,11 +60,11 @@ func init() {
 
 	// Populate Xiaohe Shuangpin final map
 	xiaoheFinalMap = map[string]string{
-		"a": "a", "o": "o", "e": "e", "i": "i", "u": "u", "v": "u",
+		"a": "a", "o": "o", "e": "e", "i": "i", "u": "u", "v": "v",
 		"ai": "d", "ei": "w", "ao": "c", "ou": "z",
 		"an": "j", "en": "f", "ang": "h", "eng": "g", "ong": "s", "iong": "s",
 		"ia": "x", "ie": "p", "iao": "n", "iu": "q", "ian": "m", "in": "b", "iang": "l", "ing": "k",
-		"ua": "x", "uo": "o", "uai": "k", "ui": "v", "uan": "r", "un": "y", "uang": "l",
+		"ua": "x", "uo": "o", "uai": "k", "ue": "t", "ui": "v", "uan": "r", "un": "y", "uang": "l",
 		"ve": "t", "vn": "y",
 	}
 
